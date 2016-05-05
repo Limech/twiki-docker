@@ -1,65 +1,26 @@
 FROM centos:6.7
 
-# add our user and group first to make sure their IDs get assigned consistently, regardless of whatever dependencies get added
-RUN groupadd -r www-data && useradd -r --create-home -g www-data www-data
-
-ENV HTTPD_PREFIX /usr/local/apache2
-ENV PATH $PATH:$HTTPD_PREFIX/bin
-RUN mkdir -p "$HTTPD_PREFIX" \
-	&& chown www-data:www-data "$HTTPD_PREFIX"
-WORKDIR $HTTPD_PREFIX
-
-# install httpd runtime dependencies
-# https://httpd.apache.org/docs/2.4/install.html#requirements
-RUN yum update \
-	&& yum install -y \
-		libapr1 \
-		libaprutil1 \
-		libapr1-dev \
-		libaprutil1-dev \
-		libpcre++0 \
-		libssl1.0.0 \
-	&& rm -r /var/lib/apt/lists/*
-
-ENV HTTPD_VERSION 2.2.31
-ENV HTTPD_BZ2_URL https://www.apache.org/dist/httpd/httpd-$HTTPD_VERSION.tar.bz2
-
-RUN buildDeps=' \
-		ca-certificates \
-		curl \
-		bzip2 \
-		gcc \
-		libpcre++-dev \
-		libssl-dev \
-		make \
-	' \
-	set -x \
-	&& yum update \
-	&& yum install -y $buildDeps \
-	&& rm -r /var/lib/apt/lists/* \
-	&& curl -fSL "$HTTPD_BZ2_URL" -o httpd.tar.bz2 \
-	&& curl -fSL "$HTTPD_BZ2_URL.asc" -o httpd.tar.bz2.asc \
-# see https://httpd.apache.org/download.cgi#verify
-	&& export GNUPGHOME="$(mktemp -d)" \
-	&& gpg --keyserver ha.pool.sks-keyservers.net --recv-keys B1B96F45DFBDCCF974019235193F180AB55D9977 \
-	&& gpg --batch --verify httpd.tar.bz2.asc httpd.tar.bz2 \
-	&& rm -r "$GNUPGHOME" httpd.tar.bz2.asc \
-	&& mkdir -p src/httpd \
-	&& tar -xvf httpd.tar.bz2 -C src/httpd --strip-components=1 \
-	&& rm httpd.tar.bz2 \
-	&& cd src/httpd \
-	&& ./configure --enable-so --enable-ssl --prefix=$HTTPD_PREFIX --enable-mods-shared=most \
-	&& make -j"$(nproc)" \
-	&& make install \
-	&& cd ../../ \
-	&& rm -r src/httpd \
-	&& sed -ri ' \
-		s!^(\s*CustomLog)\s+\S+!\1 /proc/self/fd/1!g; \
-		s!^(\s*ErrorLog)\s+\S+!\1 /proc/self/fd/2!g; \
-		' /usr/local/apache2/conf/httpd.conf \
-	&& apt-get purge -y --auto-remove $buildDeps
-
-COPY httpd-foreground /usr/local/bin/
+RUN yum -y update && yum clean all 
+RUN yum -y install tar httpd perl perl-CGI && yum clean all
+COPY TWiki20040903.tar.gz /tmp/
+RUN mkdir /var/www/html/wiki && tar -xvf /tmp/TWiki20040903.tar.gz -C /var/www/html/wiki/ --strip 1
+RUN sed -i 's|!FILE_path_to_TWiki!|/var/www/html/wiki|g' /var/www/html/wiki/bin/.htaccess.txt \
+    && sed -i 's|!URL_path_to_TWiki!||g' /var/www/html/wiki/bin/.htaccess.txt
+RUN mv /var/www/html/wiki/bin/.htaccess.txt /var/www/html/wiki/bin/.htaccess
+RUN sed -i "s|$twikiLibPath = '../lib';|$twikiLibPath = '/var/www/html/wiki/lib';|g" /var/www/html/wiki/bin/setlib.cfg \
+    && sed -i "s|/home/httpd/twiki|/var/www/html/wiki|g" /var/www/html/wiki/lib/TWiki.cfg \ 
+    && sed -i "s|http://your.domain.com|http://twiki|g" /var/www/html/wiki/lib/TWiki.cfg \
+    && sed -i "s|/twiki/bin|/bin|g" /var/www/html/wiki/lib/TWiki.cfg \
+    && sed -i "s|/twiki/pub|/pub|g" /var/www/html/wiki/lib/TWiki.cfg \
+    && sed -i "s|gmtime|servertime|g" /var/www/html/wiki/lib/TWiki.cfg \
+    && sed -i "s|$doRememberRemoteUser = \"0\";|$doRememberRemoteUser = \"1\";|g" /var/www/html/wiki/lib/TWiki.cfg \
+    && chown -R apache:apache /var/www/html/wiki \
+    && chmod -R go-rwx /var/www/html/wiki \
+    && chmod 500 /var/www/html/wiki/templates
+    
+    
+COPY httpd.conf /etc/httpd/conf/
 
 EXPOSE 80
-CMD ["httpd-foreground"]
+#CMD /bin/bash
+ENTRYPOINT ["/usr/sbin/httpd", "-D", "FOREGROUND"]
