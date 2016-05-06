@@ -14,12 +14,13 @@ RUN sed -i "s|$twikiLibPath = '../lib';|$twikiLibPath = '/var/www/html/wiki/lib'
     && sed -i "s|/twiki/pub|/pub|g" /var/www/html/wiki/lib/TWiki.cfg \
     && sed -i "s|gmtime|servertime|g" /var/www/html/wiki/lib/TWiki.cfg \
     && sed -i "s|$doRememberRemoteUser = \"0\";|$doRememberRemoteUser = \"1\";|g" /var/www/html/wiki/lib/TWiki.cfg \
+    && sed -i "s|$doRemovePortNumber = \"1\";|$doRemovePortNumber = \"0\";|g" /var/www/html/wiki/lib/TWiki.cfg \
     && chown -R apache:apache /var/www/html/wiki \
     && chmod -R go-rwx /var/www/html/wiki \
     && chmod 500 /var/www/html/wiki/templates
     
     
-COPY httpd.conf /etc/httpd/conf/
+COPY httpd.conf  /etc/httpd/conf/
 
 EXPOSE 80
 #CMD /bin/bash
