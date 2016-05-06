@@ -13,8 +13,8 @@ COPY httpd.conf /etc/httpd/conf/
 # Copy and configure Twiki framework under /var/www/html/wiki
 COPY TWiki20040904.tar.gz /tmp/
 RUN mkdir ${wikiPath} && tar -xvf /tmp/TWiki20040904.tar.gz -C ${wikiPath}/ --strip 1
-COPY configTwiki.sh ${wikiPath}
-RUN /bin/bash -c 'configTwiki.sh'
+COPY configTwiki.sh  ${wikiPath}/
+RUN /bin/bash -c 'source ${wikiPath}/configTwiki.sh'
 
 EXPOSE 80
 
